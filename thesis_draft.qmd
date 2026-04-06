@@ -29,6 +29,11 @@ format:
 #| lablel: set-up
 #| include: false # Use to hide code and results
 
+download.file("https://raw.githubusercontent.com/tylerstoen/multi-variate-dcm-thesis/refs/heads/main/helpers.R", "helpers.R")
+download.file("https://raw.githubusercontent.com/tylerstoen/multi-variate-dcm-thesis/refs/heads/main/main.R", "main.R")
+source("main.R")
+source("helpers.R")
+
 # I recommend having a hidden code chunk to prep any packages or data sets!
 
 library(tidyverse)
@@ -36,6 +41,41 @@ library(kableExtra)
 
 data("starwars")
 ```
+
+# Introduction
+
+Sustainable farming practices are crucial in minimizing the environmental impact of agricultural production. A key factor is understanding soil health, which is essential for crop productivity and longevity. Soil health is largely influenced by the variety and abundance of soil microorganisms, which perform essential functions such as nutrient cycling, decomposition, and disease suppression.
+
+
+A study conducted by the (Biochemistry?) department at California Polytechnic State University, San Luis Obispo sampled soil from a Central California vineyard, measuring microbial community composition across three years and four stages of the grapevine life cycle: bud break, bloom, veraison, and harvest. Three experiments tested the effects of herbicide presence, cover cropping, and fertilizer type on microbial abundance. Three soil samples were collected per treatment at each stage, yielding 96 total samples, each analyzed for the abundance of each microorganism present.
+
+
+Soil microbial diversity is measured using two complementary metrics. Alpha diversity captures the richness and evenness of taxa within individual samples, while beta diversity measures differences in community composition between samples. Previous analysis of this dataset used permutation tests to assess alpha diversity across treatments, finding no statistically significant differences — suggesting that overall microbial richness and evenness remained relatively constant regardless of treatment. Beta diversity, however, was not explored. Because beta diversity characterizes how community structure varies across samples and treatments rather than within them, it may reveal compositional patterns that alpha diversity cannot.
+
+
+Comparing data sampled under different conditions typically amounts to a first-order analysis such as a difference in means in two treatment cases, or an ANOVA test in multi-treatment cases. However, these methods often only capture overall behavior across conditions and fail to measure the behavior of individual variables or a small set of variables. Second-order statistics such as correlation uncover these behaviors, leading to a more comprehensive analysis of the treatment on an individual variable level. In the vineyard context, alpha diversity is a first-order summary: it describes the richness or evenness of a single sample in isolation. Beta diversity is second-order: it quantifies the compositional distance between samples, capturing how microbial community structure shifts across treatments rather than simply whether average abundance changes.
+
+
+Differential correlation allows for a quantification of treatment effects on variables and specifically how different treatments change, or do not change, the relationship between variables. Differential correlation is well defined for a two treatment case, and is simply computed by subtracting the average correlation across the two conditions. For example, given variables *i* and *j*, the differential correlation is defined as the difference in their pairwise correlation between two treatment conditions:
+$$
+\Delta r_{ij} = r^{(1)}_{ij} - r^{(2)}_{ij}
+$$ {#eq-rdiff}
+where $r^{(1)}_{ij}$ and $r^{(2)}_{ij}$ denote the Pearson correlation between items *i* and *j* under treatments 1 and 2, respectively. A large $\Delta r_{ij}$ indicates that *i* and *j* are strongly correlated under one treatment but not the other, suggesting that the relationship between items changes depending on treatment. As stated above, beta diversity is fundamentally concerned with how microbial community composition differs between samples and treatments. Differential correlation handles this well, as it can describe how relationships between microorganisms shift across treatments through individual $/Delta r$ values. Applying @eq-rdiff across all pairs of microorganisms produces a complete summary of how the community of organisms responds to treatment. 
+
+
+Beyond identifying individual pairs with large differential correlation, a natural question is whether groups of microorganisms share a coherent shift in co-occurrence structure. Such groups would indicate that treatment does not merely perturb individual relationships but reorganizes communities of microorganisms in a coordinated way. Differential Correlation Mining (DCM) is an existing method for analyzing differences in correlation structure between two different sampling conditions. DCM identifies groups of variables whose average pairwise correlation is significantly higher under one condition than another. DCM works by iteratively updating a set of interest, at each step computing the average correlation under both conditions and then testing whether each variable of interest is more highly correlated with the current set under one condition than the other. If this is true, the variable is added to the set and the process is repeated. The result of the procedure is an estimated differentially correlated (DC) clique, representing a stable set of variables that share a coherent shift in correlation structure across treatments.
+
+
+Recall that the vineyard data includes three sub-experiments: herbicide (none vs. herbicide), cover crop watering (high, low, and none), and fertilizer type (none, synthetic, and organic). DCM is well defined for the two-treatment case, as a single difference $\Delta r_{ij}$ has a natural interpretation as the directional shift in correlation from one condition to the other. 
+
+
+For the cover crop and fertilizer experiments, each with three treatment levels, no single $\Delta r_{ij}$ summarizes the full correlation structure across conditions. One approach is to perform $\binom{3}{2} = 3$ pairwise comparisons, applying DCM separately to each pair. However, this is limited in that results across comparisons may be inconsistent — a DC clique identified in one pairwise comparison may not appear in another, meaning a group of microorganisms may shift their co-occurrence structure between two specific treatments but not others. Rather than a single coherent summary of community response, the three-treatment case yields a collection of comparison-specific cliques that must be interpreted together, making it unclear which contrasts are most meaningful or how to aggregate them into a unified conclusion. This motivates the need for a generalized DCM approach that can handle multiple treatments simultaneously, producing a single summary of differential correlation structure across all conditions. 
+
+
+In this thesis, we will propose a generalization of DCM that applies for three-or-more treatments. The approach In chapter 2, we will discuss the algorithm in detail. 
+
+
+
 
 # Literature Review
 
