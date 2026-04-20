@@ -42,15 +42,27 @@ library(kableExtra)
 data("starwars")
 ```
 
-# Introduction
+# Introduction {#sec-intro}
 
 Sustainable farming practices are crucial in minimizing the environmental impact of agricultural production. A key factor is understanding soil health, which is essential for crop productivity and longevity. Soil health is largely influenced by the variety and abundance of soil microorganisms, which perform essential functions such as nutrient cycling, decomposition, and disease suppression.
 
 
-A study conducted by the (Biochemistry?) department at California Polytechnic State University, San Luis Obispo sampled soil from a Central California vineyard, measuring microbial community composition across three years and four stages of the grapevine life cycle: bud break, bloom, veraison, and harvest. Three experiments tested the effects of herbicide presence, cover cropping, and fertilizer type on microbial abundance. Three soil samples were collected per treatment at each stage, yielding 96 total samples, each analyzed for the abundance of each microorganism present.
+A study conducted by the Chemistry department at California Polytechnic State University, San Luis Obispo sampled soil from a Central California vineyard, measuring microbial community composition across three years and four stages of the grapevine life cycle: bud break, bloom, veraison, and harvest. Three experiments tested the effects of herbicide presence, cover cropping, and fertilizer type on microbial abundance. Three replicate soil samples were collected per treatment at each stage, yielding 96 total samples. These samples were analyzed for genetic markers leading to an estimate of abundance for each class of microorganism present.
 
 
-Soil microbial diversity is measured using two complementary metrics. Alpha diversity captures the richness and evenness of taxa within individual samples, while beta diversity measures differences in community composition between samples. Previous analysis of this dataset used permutation tests to assess alpha diversity across treatments, finding no statistically significant differences — suggesting that overall microbial richness and evenness remained relatively constant regardless of treatment. Beta diversity, however, was not explored. Because beta diversity characterizes how community structure varies across samples and treatments rather than within them, it may reveal compositional patterns that alpha diversity cannot.
+![Experiment Design](experiment design.png){#fig-design}
+
+
+Typically, soil microbial diversity is measured using two complementary metrics. Alpha diversity captures the richness and evenness of taxa within individual samples, while beta diversity measures differences in community composition between samples. Previous analysis of this dataset used permutation tests to assess alpha diversity across treatments, finding no statistically significant differences — suggesting that overall microbial richness and evenness remained relatively constant regardless of treatment. However, some groupwise differences in beta diversity across conditions were detected, indicating possible variation in community interaction of microorganisms in reaction to experimental conditions. Based on these results, this work aims to identify the drivers of these differences in beta diversity.
+
+
+[in this paragraph, cite: Soil Diversity Under Experimental Conditions. Katherine Rose Watts, Kelly N. Bodwin, Josiah Gilbert. (in preparation)]
+
+
+In this thesis, we introduce a new method, motivated by the structure of the soil experiment data, for identifying sets of entities (microorganisms) that are differently correlated across conditions. In the resulting sets, all members will have the characteristic of having a stronger correlation under some conditions than others.
+
+
+## Differential Correlation {#sec-dc}
 
 
 Comparing data sampled under different conditions typically amounts to a first-order analysis such as a difference in means in two treatment cases, or an ANOVA test in multi-treatment cases. However, these methods often only capture overall behavior across conditions and fail to measure the behavior of individual variables or a small set of variables. Second-order statistics such as correlation uncover these behaviors, leading to a more comprehensive analysis of the treatment on an individual variable level. In the vineyard context, alpha diversity is a first-order summary: it describes the richness or evenness of a single sample in isolation. Beta diversity is second-order: it quantifies the compositional distance between samples, capturing how microbial community structure shifts across treatments rather than simply whether average abundance changes.
@@ -60,19 +72,59 @@ Differential correlation allows for a quantification of treatment effects on var
 $$
 \Delta r_{ij} = r^{(1)}_{ij} - r^{(2)}_{ij}
 $$ {#eq-rdiff}
-where $r^{(1)}_{ij}$ and $r^{(2)}_{ij}$ denote the Pearson correlation between items *i* and *j* under treatments 1 and 2, respectively. A large $\Delta r_{ij}$ indicates that *i* and *j* are strongly correlated under one treatment but not the other, suggesting that the relationship between items changes depending on treatment. As stated above, beta diversity is fundamentally concerned with how microbial community composition differs between samples and treatments. Differential correlation handles this well, as it can describe how relationships between microorganisms shift across treatments through individual $/Delta r$ values. Applying @eq-rdiff across all pairs of microorganisms produces a complete summary of how the community of organisms responds to treatment. 
+where $r^{(1)}_{ij}$ and $r^{(2)}_{ij}$ denote the Pearson correlation between items *i* and *j* under treatments 1 and 2, respectively. A large $\Delta r_{ij}$ indicates that *i* and *j* are strongly correlated under one treatment but not the other, suggesting that the relationship between items changes depending on treatment. Differential correlation importantly contrasts from co-occurrence in the same samples: two items may be consistently present together while showing no differential correlation, or may show strong shifts in correlation structure even at similar abundance levels. As stated above, beta diversity is fundamentally concerned with how microbial community composition differs between samples and treatments. Differential correlation handles this well, as it can describe how relationships between microorganisms shift across treatments through individual $\Delta r$ values. Applying @eq-rdiff across all pairs of microorganisms produces a complete summary of how the community of organisms responds to treatment. 
 
 
-Beyond identifying individual pairs with large differential correlation, a natural question is whether groups of microorganisms share a coherent shift in co-occurrence structure. Such groups would indicate that treatment does not merely perturb individual relationships but reorganizes communities of microorganisms in a coordinated way. Differential Correlation Mining (DCM) is an existing method for analyzing differences in correlation structure between two different sampling conditions. DCM identifies groups of variables whose average pairwise correlation is significantly higher under one condition than another. DCM works by iteratively updating a set of interest, at each step computing the average correlation under both conditions and then testing whether each variable of interest is more highly correlated with the current set under one condition than the other. If this is true, the variable is added to the set and the process is repeated. The result of the procedure is an estimated differentially correlated (DC) clique, representing a stable set of variables that share a coherent shift in correlation structure across treatments.
+To gain a deeper understanding of microorganism relationships beyond identifying individual pairs with large differential correlation, a natural question is whether groups of microorganisms have correlations that are stronger under some treatments than others. Such groups would suggest that treatment has a systematic effect on how microorganisms associate with one another, rather than having only an isolated effect on individual pairs. Differential Correlation Mining (DCM) is an existing method for analyzing differences in correlation structure between two different sampling conditions, first introduced by Bodwin, Zhang, and Nobel (2018). DCM identifies groups of variables whose average pairwise correlation is significantly higher under one condition than another. DCM works by iteratively updating a set of interest, at each step computing the average correlation under both conditions and then testing whether each variable of interest is more highly correlated with the current set under one condition than the other. If this is true, the variable is added to the set and the process is repeated. The result of the procedure is an estimated differentially correlated (DC) clique, representing a stable set of variables that have a condition-dependent correlation structure, where correlation between items in the set is stronger or weaker depending on treatment.
 
 
-Recall that the vineyard data includes three sub-experiments: herbicide (none vs. herbicide), cover crop watering (high, low, and none), and fertilizer type (none, synthetic, and organic). DCM is well defined for the two-treatment case, as a single difference $\Delta r_{ij}$ has a natural interpretation as the directional shift in correlation from one condition to the other. 
+Recall that the vineyard data includes three sub-experiments: herbicide (none vs. herbicide), cover crop watering (high, low, and none), and fertilizer type (none, synthetic, and organic). As described above, DCM is well defined for the two-treatment case (herbicide), as a single difference $\Delta r_{ij}$ has a natural interpretation as the directional shift in correlation from one condition to the other.
 
 
-For the cover crop and fertilizer experiments, each with three treatment levels, no single $\Delta r_{ij}$ summarizes the full correlation structure across conditions. One approach is to perform $\binom{3}{2} = 3$ pairwise comparisons, applying DCM separately to each pair. However, this is limited in that results across comparisons may be inconsistent — a DC clique identified in one pairwise comparison may not appear in another, meaning a group of microorganisms may shift their co-occurrence structure between two specific treatments but not others. Rather than a single coherent summary of community response, the three-treatment case yields a collection of comparison-specific cliques that must be interpreted together, making it unclear which contrasts are most meaningful or how to aggregate them into a unified conclusion. This motivates the need for a generalized DCM approach that can handle multiple treatments simultaneously, producing a single summary of differential correlation structure across all conditions. 
+For the cover crop and fertilizer experiments, each with three treatment levels, no single $\Delta r_{ij}$ summarizes the full correlation structure across conditions. One approach is to perform $\binom{3}{2} = 3$ pairwise comparisons, applying DCM separately to each pair. However, this is limited in that results across comparisons may be inconsistent — a DC clique identified in one pairwise comparison may not appear in another, meaning a group of microorganisms may shift their co-occurrence structure between two specific treatments but not others. Rather than a single coherent summary of community response, the three-treatment case yields a collection of comparison-specific cliques that must be interpreted together, making it unclear which contrasts are most meaningful or how to aggregate them into a unified conclusion. This motivates the need for a generalized DCM approach that can handle multiple treatments simultaneously, producing a single summary of differential correlation behavior across all conditions. 
 
 
-In this thesis, we will propose a generalization of DCM that applies for three-or-more treatments. The approach In chapter 2, we will discuss the algorithm in detail. 
+Existing methods for differential correlation analysis are largely designed for the two-condition setting and operate at the level of individual variable pairs rather than coherent sets (see Cai and Zhang (2016) and Siska, Bowler, and Kechris (2016)). Extensions to multiple conditions focus on global matrix-level testing rather than set identification (Gómez, Zhang, and Liu (2025)), testing for global correlation structure differences across treatments. This motivates the need for a generalized DCM approach that handles multiple treatments simultaneously, producing an interpretable set of variables where correlation between items shift coherently across all conditions.
+
+
+In this thesis, we will propose a generalization of DCM that applies for three-or-more treatments. The approach works almost identically to the two-treatment situation, with the exception of the computed test statistic accounting for all treatment groups simultaneously instead of only a one-to-one comparison. In chapter 2, we will discuss the algorithm in detail.
+
+
+While the two-treatment formulation of DCM provides a powerful framework for identifying differentially correlated taxa between a pair of conditions, studies like the vineyard soil diversity example, do not always reduce to a one-to-one comparison. Experiments involving seasonal variation, multiple land-use types, or tiered intervention levels naturally produce three or more treatment groups, and applying pairwise DCM repeatedly across all combinations fails to capture the joint structure of correlation differences across the full experimental design. The generalization proposed here addresses this directly by extending the test statistic to measure divergence across all treatment groups in a single unified test, preserving the iterative set-based search strategy of the original algorithm while scaling to more complex experimental structures. This extension is, to our knowledge, the first formulation of DCM that operates natively on three or more treatments.
+
+
+# VSAT Procedure {#sec-vsat}
+
+
+## Algorithm Overview {#sec-algo-overview}
+
+
+In this section, we discuss the general search procedure used by VSAT for discovering differentially correlated sets of variables. The procedure is nearly identical to the two-treatment DCM algorithm of Bodwin, Zhang, and Nobel (2018), extended to handle three treatment groups simultaneously. The core logic is the same: the algorithm maintains a candidate set $A$ and refines it iteratively using hypothesis tests that evaluate each item's differential correlation with the current set. The VSAT algorithm differs from DCM in the test statistic, which is generalized to measure variation in correlation structure across all three conditions jointly, and p-value computation.
+
+
+As noted in Bodwin, Zhang, and Nobel (2018), an important advantage of DCM, and thus VSAT, is that it produces sets without requiring the user to pre-specify the number or size of output sets. Rather than partitioning taxa into a fixed number of groups as in k-means clustering, or requiring a cutoff as in hierarchical clustering, the algorithm determines set membership entirely through the multiple testing procedure applied at each iteration. An item is included in the output set if and only if it passes the significance threshold, so both the size and composition of the set are driven by the signal in the data rather than by arbitrary tuning choices.
+
+
+The algorithm begins with an initial set $A$, which can either be user-specified or selected using a greedy scoring procedure. Initialization is discussed in detail in @sec-set-init. The set is then passed through an iterative update step, at each iteration revising $A$ based on hypothesis tests for differential correlation intensity across all treatment groups. Hypothesis testing is done based on a user-specified method, choosing between two possible test statistic computations. One using a Kruskal-Wallace test, discussed in detail in @sec-kw-test, and the other using permutation, discussed in @sec-perm-test. Both methods test the same null hypothesis, stating that the correlation between item $j$ and the current set $A$ does not differ across treatment groups, but evaluate significance differently. Regardless of which method is chosen, a large test statistic for item $j$ indicates that its average correlation with the current set $A$ is stronger under some conditions than others, and thus that $j$ is a candidate for inclusion in the differentially correlated set.
+
+
+Iteration continues until the set stabilizes, yielding an estimated differentially correlated set — a group of items where correlation between items in the set have differing strength across conditions. Stabili
+
+
+Detailed below is the pseudo-code for the VSAT algorithm:
+
+
+
+## Problems with a Parametric Approach
+
+
+## Permutation Testing {#sec-perm-test}
+
+
+## Kruskal-Wallace Testing {#sec-kw-test}
+
+
+## Initialization {#sec-set-init}
 
 
 
@@ -129,6 +181,8 @@ https://CRAN.R-project.org/.
 
 ::: {#refs}
 :::
+
+Bodwin, B. K., Zhang, K., & Nobel, A. (2018). A TESTING BASED APPROACH TO THE DISCOVERY OF DIFFERENTIALLY CORRELATED VARIABLE SETS. The annals of applied statistics, 12(2), 1180–1203. https://doi.org/10.1214/17-AOAS1083
 
 \appendix
 
