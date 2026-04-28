@@ -29,15 +29,18 @@ format:
 #| lablel: set-up
 #| include: false # Use to hide code and results
 
-download.file("https://raw.githubusercontent.com/tylerstoen/multi-variate-dcm-thesis/refs/heads/main/helpers.R", "helpers.R")
-download.file("https://raw.githubusercontent.com/tylerstoen/multi-variate-dcm-thesis/refs/heads/main/main.R", "main.R")
+download.file("https://raw.githubusercontent.com/tylerstoen/VSAT/refs/heads/main/helpers.R", "helpers.R")
+download.file("https://raw.githubusercontent.com/tylerstoen/VSAT/refs/heads/main/main.R", "main.R")
+download.file("https://raw.githubusercontent.com/tylerstoen/VSAT/refs/heads/main/testing.R", "testing.R")
 source("main.R")
 source("helpers.R")
+source("testing.R")
 
 # I recommend having a hidden code chunk to prep any packages or data sets!
 
 library(tidyverse)
 library(kableExtra)
+library(MASS)
 
 data("starwars")
 ```
@@ -105,17 +108,195 @@ In this section, we discuss the general search procedure used by VSAT for discov
 As noted in Bodwin, Zhang, and Nobel (2018), an important advantage of DCM, and thus VSAT, is that it produces sets without requiring the user to pre-specify the number or size of output sets. Rather than partitioning taxa into a fixed number of groups as in k-means clustering, or requiring a cutoff as in hierarchical clustering, the algorithm determines set membership entirely through the multiple testing procedure applied at each iteration. An item is included in the output set if and only if it passes the significance threshold, so both the size and composition of the set are driven by the signal in the data rather than by arbitrary tuning choices.
 
 
-The algorithm begins with an initial set $A$, which can either be user-specified or selected using a greedy scoring procedure. Initialization is discussed in detail in @sec-set-init. The set is then passed through an iterative update step, at each iteration revising $A$ based on hypothesis tests for differential correlation intensity across all treatment groups. Hypothesis testing is done based on a user-specified method, choosing between two possible test statistic computations. One using a Kruskal-Wallace test, discussed in detail in @sec-kw-test, and the other using permutation, discussed in @sec-perm-test. Both methods test the same null hypothesis, stating that the correlation between item $j$ and the current set $A$ does not differ across treatment groups, but evaluate significance differently. Regardless of which method is chosen, a large test statistic for item $j$ indicates that its average correlation with the current set $A$ is stronger under some conditions than others, and thus that $j$ is a candidate for inclusion in the differentially correlated set.
+The algorithm begins with an initial set $A$, which can either be user-specified or selected using a greedy scoring procedure. Initialization is discussed in detail in @sec-set-init. The set is then passed through an iterative update step, at each iteration revising $A$ based on hypothesis tests for differential correlation intensity across all treatment groups. Hypothesis testing is done based on a user-specified method, choosing between two possible test statistic and p-value computations: a Kruskal-Wallace approach, discussed in @sec-kw-test, and a permutation-based approach, discussed in @sec-perm-test. The motivation for both approaches and the formal hypothesis being tested are discussed in @sec-parametric, where we address why standard parametric testing is not directly applicable to correlation-based statistics of this form.
 
 
-Iteration continues until the set stabilizes, yielding an estimated differentially correlated set — a group of items where correlation between items in the set have differing strength across conditions. Stabili
+Iteration continues until the set stabilizes, yielding an estimated differentially correlated (DC) set. These DC sets have the desired characteristic discussed in @sec-intro: a group of items where correlation between items in the set have differing strength across conditions. 
 
 
 Detailed below is the pseudo-code for the VSAT algorithm:
 
 
 
-## Problems with a Parametric Approach
+## Problems with a Parametric Approach {#sec-parametric}
+
+
+As discussed previously, at each iterative step, $A$ is updated using a hypothesis test. When comparing the effect of three different treatments, the common practice is to use a standard one-way ANOVA test, which assesses whether the mean of some quantity differs across groups. ANOVA requires that the quantity being compared is approximately normally distributed within each group. In the context of our problem, the natural quantity to compare across treatment groups is the average correlation between item $j$ and the current set $A$ under each condition. We define this formally as:
+$$
+S_{k}(j, A) = \frac{1}{|A \setminus{j}|} \sum_{i\in A \setminus{j}} r_k(i,j)
+$$ {#eq-connection}
+where $r_k(i,j)$ is the sample correlation between items $i$ and $j$ under condition $k$. We call this quantity the "connection" between every item $i \in A \setminus j$ and $j$. To measure how much $S_{k}(j,A)$ varies across the three conditions simultaneously, we define the affinity of $j$ with respect to $A$ as:
+$$
+\Delta(j, A) = \frac13 \sum_{k=1}^3 (S_{k}(j, A) - \bar S(j, A))^2
+$$ {#eq-affinity}
+where $\bar S(j, A) = \frac13 \sum_{k=1}^3 S_{k}(j, A)$ is the average of the group-specific mean correlations. This parallels the between-group sum of squares in ANOVA, where $S_k(j,A)$ plays the role of a group mean and $\bar S(j,A)$ plays the role of the overall mean. A large value of $\Delta(j,A)$ indicates that the average correlation between $j$ and the current set differs across conditions, making $j$ a candidate for inclusion in the DC set.
+
+
+However, applying ANOVA directly to test whether $\Delta(j,A)$ is significantly large requires that $S_k(j,A)$ is approximately normally distributed within each group. Sample correlations are known to be non-normally distributed, particularly in small samples, since their distribution is bounded between -1 and 1 and is skewed when the true correlation departs from zero. The plot below exemplifies this:
+
+
+```{r}
+#| label: fig-non-normal
+#| echo: FALSE
+#| warning: FALSE
+
+n <- 20
+n_sim <- 10000
+rho_vals <- c(0, 0.3, 0.6, 0.9)
+
+set.seed(33)
+sim_results <- map(rho_vals, function(rho) {
+  
+  Sigma <- matrix(c(1, rho, rho, 1), nrow = 2)
+  
+  r_vals <- replicate(n_sim, {
+    dat <- mvrnorm(n, mu = c(0, 0), Sigma = Sigma)
+    cor(dat[, 1], dat[, 2])
+  })
+  
+  tibble(r = r_vals, rho = paste0("rho == ", rho))
+}) |>
+  list_rbind() |>
+  mutate(rho = factor(rho, levels = paste0("rho == ", rho_vals)))
+
+ggplot(sim_results, aes(x = r)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 60,
+                 fill = "steelblue",
+                 color = "white",
+                 alpha = 0.7) +
+  facet_wrap(~ rho, ncol = 2, scales = "free_y", labeller = label_parsed) +
+  scale_x_continuous(limits = c(-1, 1), breaks = c(-1, -0.5, 0, 0.5, 1)) +
+  labs(
+    title    = "Sampling Distribution of Sample Correlation",
+    subtitle = paste0("n = ", n, ", ", n_sim, " simulations per rho"),
+    x        = "Sample correlation r",
+    y        = "Density"
+  ) +
+  theme_bw(base_size = 13) +
+  theme(
+    strip.background = element_rect(fill = "grey92"),
+    strip.text       = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+```
+
+
+Since $S_k(j, A)$ is an average of sample correlations across the members of $A$, it inherits this same non-normality, and the problem is most severe precisely in the setting we care about, where the true correlation within $A$ is large under at least one condition. Figure @fig-sk-nonnormal confirms this using the simulation framework described in detail in @sec-simulation. 
+
+
+```{r}
+#| label: fig-sk-nonnormal
+#| echo: FALSE
+#| warning: FALSE
+
+rows     <- 100
+cols     <- 20
+n_sim    <- 5000
+test_grp <- 1:10
+j        <- "V1"
+A_set    <- paste0("V", 2:10)
+
+set.seed(42)
+sim_results_sk <- replicate(n_sim, {
+  dat       <- treatment_data_generation_3d(rows, cols, 0.8, 0, 0, test_grp)
+  corr_mats <- lapply(dat, function(mat) cor(t(mat)))
+  c(
+    compute_S(corr_mats[[1]], j, A_set),
+    compute_S(corr_mats[[2]], j, A_set),
+    compute_S(corr_mats[[3]], j, A_set)
+  )
+}) |>
+  t() |>
+  as.data.frame() |>
+  setNames(c("T1", "T2", "T3")) |>
+  pivot_longer(everything(), names_to = "Treatment", values_to = "S_k") |>
+  mutate(
+    Treatment = recode(
+      Treatment,
+      T1 = "Treatment~1~(rho==0.8)",
+      T2 = "Treatment~2~(rho==0)",
+      T3 = "Treatment~3~(rho==0)"
+    )
+  )
+
+ggplot(sim_results_sk, aes(x = S_k)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins  = 60,
+                 fill  = "steelblue",
+                 color = "white",
+                 alpha = 0.7) +
+  facet_wrap(~ Treatment, ncol = 1, labeller = label_parsed) +
+  scale_x_continuous(limits = c(-1, 1), breaks = c(-0.5, 0, 0.5)) +
+  labs(
+    title    = expression("Sampling Distribution of " * S[k](j, A) *
+                            " Under High Signal"),
+    subtitle = paste0("Item 1 vs. A = {Item 2, ..., Item 10}, n = ", cols,
+                      " samples per group"),
+    x        = expression(S[k](j, A)),
+    y        = "Density"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    strip.background = element_rect(fill = "grey92"),
+    strip.text       = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+```
+
+
+Under the high signal scenario, where Treatment 1 has true within-set correlation $\rho = 0.8$ and Treatments 2 and 3 have $\rho = 0$, the distribution of $S_1(j, A)$ is strongly left-skewed while $S_2(j, A)$ and $S_3(j, A)$ remain more symmetric. A normal approximation fits poorly for Treatment 1, where it matters most.
+
+
+To combat this issue, Bodwin, Zhang, and Nobel (2018) leveraged individual sample-level correlation contributions to construct a test statistic that had approximately normal behavior in the two-treatment situation, despite sample correlations being highly non-normal. Contributions refer to the inner products of each observation's standardized measurements with the mean profile of the current set $A$ under each condition. They show that their resulting test statistic, when standardized by a consistent estimator of its null variance, follows an approximate standard normal distribution for sufficient sample sizes. Using this fact, items can be tested with a parametric approach for inclusion in a DC set. Based on this previous result, a natural starting point for the three-treatment case is to construct an analogous test statistic using the same sample-level correlation contributions, now computed across all three conditions simultaneously. 
+
+
+We define the necessary quantities for the three-treatment correlation contribution framework. First, we standardize each item's measurements by row within each treatment group. For item $i$ and sample $j$, define:
+$$
+u_{ij} = \frac{x_{ij} - \bar{x}_i}{\text{sd}(x_i)}, \quad v_{ij} = \frac{y_{ij} - \bar{y}_i}{\text{sd}(y_i)}, \quad w_{ij} = \frac{z_{ij} - \bar{z}_i}{\text{sd}(z_i)}
+$$
+denote the raw measurements of item $i$ in sample $j$ under treatments 1, 2, and 3 respectively. Standardization is performed across samples within each item and each treatment group, so each $\vec{u}_i$, $\vec{v}_i$, $\vec{w}_i$ is centered at zero. This is done for computational convenience and clarity because we are interested in pairwise correlations rather than raw values. Recall we define the connection between an item and the current set $A$ to be the average correlation between item $j$ and each item $i \in A \setminus j$ under each treatment condition, shown in @eq-connection as:
+$$
+S_{k}(j, A) = \frac{1}{|A \setminus{j}|} \sum_{i\in A \setminus{j}} r_k(i,j)
+$$
+
+
+To uncover the individual contributions to correlation made by each item to the connection for a given treatment, we can expand @eq-connection into standardized values. The connection in treatment 1 can be expanded:
+$$
+S_{1}(j, A) = \frac{1}{|A \setminus \{j\}|} \sum_{i\in A \setminus \{j\}} r_k(i,j) = \frac{1}{|A \setminus \{j\}|} \sum_{i\in A \setminus \{j\}} \frac{1}{n_1} \sum_{\ell=1}^{n_1}u_{j\ell}u_{i\ell} = \frac{1}{n_1} \sum_{\ell=1}^{n_1}u_{j\ell} \left(\frac{1}{|A \setminus \{j\}|} \sum_{i\in A \setminus \{j\}} u_{i\ell} \right)
+$$ {#eq-contribution-breakdown}
+Define $m_{1\ell}$ is the mean of the $\ell$-th sample across all items in $A \setminus \{j\}$ under treatment 1, so that:
+$$
+S_{1}(j, A) = \frac{1}{n_1} \sum_{\ell=1}^{n_1}u_{j\ell} \left(\frac{1}{|A \setminus \{j\}|} \sum_{i\in A \setminus \{j\}} u_{i\ell} \right) = \frac{1}{n_1} \sum_{\ell = 1}^{n_1} u_{j\ell} m_{1\ell}^{(A)} = \text {Cov}(\vec u_j, \vec m_1^{(A)})
+$$
+Contributions to $S_{1}(j, A)$ are then the vector $\tilde u_{jl} := \{u_{j1}m_{11}^{(A)}, u_{j2}m_{12}^{(A)}, ..., u_{jn_1}m_{1n_1}^{(A)}\}$ with $S_2(j, A)$ and $S_3(j, A)$ being defined using their corresponding contributions as $\tilde v_{jl} := \{v_{j1}m_{11}^{(A)}, ..., v_{jn_2}m_{1n_2}^{(A)}\}$, $\tilde w_{jl} := \{w_{j1}m_{11}^{(A)},  ..., w_{jn_3}m_{1n_3}^{(A)}\}$.
+
+
+The idea is to use this result, and the fact that, $\tilde u_{j\ell}, \tilde v_{j\ell}$ and $\tilde w_{j\ell}$ values are the within-treatment individual contributions, $S_k(j, A)$ values are the treatment level averages and $\bar S(j,A)$ is the overall average to construct:
+$$
+SS_{treatment} = \sum_{k=1}^3 (S_k(j, A) - \bar S(j,A))^2
+$$
+$$
+SS_{error} = \sum_{\ell = 1}^{n_1} (\tilde u_{j\ell} - S_1(j,A))^2 + \sum_{\ell = 1}^{n_2} (\tilde v_{j\ell} - S_2(j,A))^2 + \sum_{\ell = 1}^{n_2} (\tilde w_{j\ell} - S_3(j,A))^2
+$$
+Under the ANOVA assumptions, which would require contributions are approximately independent, normally distributed, and have equal variance across treatment groups the ratio:
+$$
+F=\frac {SS_{treatment}/(3−1)} {SS_{error}/(n_{total}−3)}≈F_{2,n_{total}−3}
+$$
+This, in theory, would be the multivariate version of the correlation contribution breakdown from Bodwin, Zhang, and Nobel (2018), which would allow for the use of a parametric test in the update step.
+However, the contributions ($\tilde{u}_{j\ell}, \tilde{v}_{j\ell}, \tilde{w}_{j\ell}$) must be independent and normally distributed for the statistic to reliably follow the $F$-distribution. 
+
+
+We know independence does not hold, as dependence is introduced by the row standardization. For example, computing $u_{j\ell} = \frac {(x_{j\ell} - \bar {x}_j)}{\text{sd}(x_j)}$ involves all $n_1$ samples, so contributions within a group are not independent of one another. We can assess the normality assumption using simulated data from the framework described in @sec-simulation. Using a simulation with 100 items, 20 samples per group, and true correlation between items in the target set $\rho = 0.8$ under treatment 1 and $\rho = 0$ under treatments 2 and 3, @fig-contributions displays the individual contributions $\tilde{u}_{j\ell}, \tilde{v}_{j\ell}, \tilde{w}_{j\ell}$ for a selection of four items, three of which have high signal and one having no signal.
+
+
+```{r}
+
+```
+
+
+
+As a result, the $F$-statistic above does not reliably follow the stated distribution, and p-values derived from it are not trustworthy. This rules out a direct parametric approach and motivates the two alternatives discussed in @sec-kw-test and @sec-perm-test.
 
 
 ## Permutation Testing {#sec-perm-test}
@@ -125,6 +306,15 @@ Detailed below is the pseudo-code for the VSAT algorithm:
 
 
 ## Initialization {#sec-set-init}
+
+
+# Simulation Study {#sec-simulation}
+
+
+# Vineyard Data
+
+
+# Conclusion
 
 
 
