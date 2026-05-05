@@ -62,7 +62,8 @@ Typically, soil microbial diversity is measured using two complementary metrics.
 [in this paragraph, cite: Soil Diversity Under Experimental Conditions. Katherine Rose Watts, Kelly N. Bodwin, Josiah Gilbert. (in preparation)]
 
 
-In this thesis, we introduce a new method, motivated by the structure of the soil experiment data, for identifying sets of entities (microorganisms) that are differently correlated across conditions. In the resulting sets, all members will have the characteristic of having a stronger correlation under some conditions than others.
+In this thesis, we introduce a new method, which we call VSAT (Variable Set Association Testing), motivated by the structure of the soil experiment data, for identifying sets of entities (microorganisms) that are differently correlated across conditions. In the resulting sets, all members will have the characteristic of having a stronger correlation under some conditions than others. 
+We call this method VSAT, or Variable Set Association Testing, a generalization of DCM that identifies variable sets exhibiting condition-dependent correlation structure across three or more treatments simultaneously.
 
 
 ## Differential Correlation {#sec-dc}
@@ -78,7 +79,7 @@ $$ {#eq-rdiff}
 where $r^{(1)}_{ij}$ and $r^{(2)}_{ij}$ denote the Pearson correlation between items *i* and *j* under treatments 1 and 2, respectively. A large $\Delta r_{ij}$ indicates that *i* and *j* are strongly correlated under one treatment but not the other, suggesting that the relationship between items changes depending on treatment. Differential correlation importantly contrasts from co-occurrence in the same samples: two items may be consistently present together while showing no differential correlation, or may show strong shifts in correlation structure even at similar abundance levels. As stated above, beta diversity is fundamentally concerned with how microbial community composition differs between samples and treatments. Differential correlation handles this well, as it can describe how relationships between microorganisms shift across treatments through individual $\Delta r$ values. Applying @eq-rdiff across all pairs of microorganisms produces a complete summary of how the community of organisms responds to treatment. 
 
 
-To gain a deeper understanding of microorganism relationships beyond identifying individual pairs with large differential correlation, a natural question is whether groups of microorganisms have correlations that are stronger under some treatments than others. Such groups would suggest that treatment has a systematic effect on how microorganisms associate with one another, rather than having only an isolated effect on individual pairs. Differential Correlation Mining (DCM) is an existing method for analyzing differences in correlation structure between two different sampling conditions, first introduced by Bodwin, Zhang, and Nobel (2018). DCM identifies groups of variables whose average pairwise correlation is significantly higher under one condition than another. DCM works by iteratively updating a set of interest, at each step computing the average correlation under both conditions and then testing whether each variable of interest is more highly correlated with the current set under one condition than the other. If this is true, the variable is added to the set and the process is repeated. The result of the procedure is an estimated differentially correlated (DC) clique, representing a stable set of variables that have a condition-dependent correlation structure, where correlation between items in the set is stronger or weaker depending on treatment.
+To gain a deeper understanding of microorganism relationships beyond identifying individual pairs with large differential correlation, a natural question is whether groups of microorganisms have correlations that are stronger under some treatments than others. Such groups would suggest that treatment has a systematic effect on how microorganisms associate with one another, rather than having only an isolated effect on individual pairs. Differential Correlation Mining (DCM) is an existing method for analyzing differences in correlation structure between two different sampling conditions, first introduced by Bodwin et. al. (2018). DCM identifies groups of variables whose average pairwise correlation is significantly higher under one condition than another. DCM works by iteratively updating a set of interest, at each step computing the average correlation under both conditions and then testing whether each variable of interest is more highly correlated with the current set under one condition than the other. If this is true, the variable is added to the set and the process is repeated. The result of the procedure is an estimated differentially correlated (DC) clique, representing a stable set of variables that have a condition-dependent correlation structure, where correlation between items in the set is stronger or weaker depending on treatment.
 
 
 Recall that the vineyard data includes three sub-experiments: herbicide (none vs. herbicide), cover crop watering (high, low, and none), and fertilizer type (none, synthetic, and organic). As described above, DCM is well defined for the two-treatment case (herbicide), as a single difference $\Delta r_{ij}$ has a natural interpretation as the directional shift in correlation from one condition to the other.
@@ -87,7 +88,7 @@ Recall that the vineyard data includes three sub-experiments: herbicide (none vs
 For the cover crop and fertilizer experiments, each with three treatment levels, no single $\Delta r_{ij}$ summarizes the full correlation structure across conditions. One approach is to perform $\binom{3}{2} = 3$ pairwise comparisons, applying DCM separately to each pair. However, this is limited in that results across comparisons may be inconsistent — a DC clique identified in one pairwise comparison may not appear in another, meaning a group of microorganisms may shift their co-occurrence structure between two specific treatments but not others. Rather than a single coherent summary of community response, the three-treatment case yields a collection of comparison-specific cliques that must be interpreted together, making it unclear which contrasts are most meaningful or how to aggregate them into a unified conclusion. This motivates the need for a generalized DCM approach that can handle multiple treatments simultaneously, producing a single summary of differential correlation behavior across all conditions. 
 
 
-Existing methods for differential correlation analysis are largely designed for the two-condition setting and operate at the level of individual variable pairs rather than coherent sets (see Cai and Zhang (2016) and Siska, Bowler, and Kechris (2016)). Extensions to multiple conditions focus on global matrix-level testing rather than set identification (Gómez, Zhang, and Liu (2025)), testing for global correlation structure differences across treatments. This motivates the need for a generalized DCM approach that handles multiple treatments simultaneously, producing an interpretable set of variables where correlation between items shift coherently across all conditions.
+Existing methods for differential correlation analysis are largely designed for the two-condition setting and operate at the level of individual variable pairs rather than coherent sets (see Cai & Zhang (2016) and Siska et. al. (2016)). Extensions to multiple conditions focus on global matrix-level testing rather than set identification (Gómez et. al.(2025)), testing for global correlation structure differences across treatments. This motivates the need for a generalized DCM approach that handles multiple treatments simultaneously, producing an interpretable set of variables where correlation between items shift coherently across all conditions.
 
 
 In this thesis, we will propose a generalization of DCM that applies for three-or-more treatments. The approach works almost identically to the two-treatment situation, with the exception of the computed test statistic accounting for all treatment groups simultaneously instead of only a one-to-one comparison. In chapter 2, we will discuss the algorithm in detail.
@@ -102,13 +103,13 @@ While the two-treatment formulation of DCM provides a powerful framework for ide
 ## Algorithm Overview {#sec-algo-overview}
 
 
-In this section, we discuss the general search procedure used by VSAT for discovering differentially correlated sets of variables. The procedure is nearly identical to the two-treatment DCM algorithm of Bodwin, Zhang, and Nobel (2018), extended to handle three treatment groups simultaneously. The core logic is the same: the algorithm maintains a candidate set $A$ and refines it iteratively using hypothesis tests that evaluate each item's differential correlation with the current set. The VSAT algorithm differs from DCM in the test statistic, which is generalized to measure variation in correlation structure across all three conditions jointly, and p-value computation.
+In this section, we discuss the general search procedure used by VSAT for discovering differentially correlated sets of variables. The procedure is nearly identical to the two-treatment DCM algorithm of Bodwin et. al. (2018), extended to handle three treatment groups simultaneously. The core logic is the same: the algorithm maintains a candidate set $A$ and refines it iteratively using hypothesis tests that evaluate each item's differential correlation with the current set. The VSAT algorithm differs from DCM in the test statistic, which is generalized to measure variation in correlation structure across all three conditions jointly, and p-value computation.
 
 
-As noted in Bodwin, Zhang, and Nobel (2018), an important advantage of DCM, and thus VSAT, is that it produces sets without requiring the user to pre-specify the number or size of output sets. Rather than partitioning taxa into a fixed number of groups as in k-means clustering, or requiring a cutoff as in hierarchical clustering, the algorithm determines set membership entirely through the multiple testing procedure applied at each iteration. An item is included in the output set if and only if it passes the significance threshold, so both the size and composition of the set are driven by the signal in the data rather than by arbitrary tuning choices.
+As noted in Bodwin et. al. (2018), an important advantage of DCM, and thus VSAT, is that it produces sets without requiring the user to pre-specify the number or size of output sets. Rather than partitioning taxa into a fixed number of groups as in k-means clustering, or requiring a cutoff as in hierarchical clustering, the algorithm determines set membership entirely through the multiple testing procedure applied at each iteration. An item is included in the output set if and only if it passes the significance threshold, so both the size and composition of the set are driven by the signal in the data rather than by arbitrary tuning choices.
 
 
-The algorithm begins with an initial set $A$, which can either be user-specified or selected using a greedy scoring procedure. Initialization is discussed in detail in @sec-set-init. The set is then passed through an iterative update step, at each iteration revising $A$ based on hypothesis tests for differential correlation intensity across all treatment groups. Hypothesis testing is done based on a user-specified method, choosing between two possible test statistic and p-value computations: a Kruskal-Wallace approach, discussed in @sec-kw-test, and a permutation-based approach, discussed in @sec-perm-test. The motivation for both approaches and the formal hypothesis being tested are discussed in @sec-parametric, where we address why standard parametric testing is not directly applicable to correlation-based statistics of this form.
+The algorithm begins with an initial set $A$, which can either be user-specified or selected using a greedy scoring procedure. Initialization is discussed in detail in @sec-set-init. The set is then passed through an iterative update step, at each iteration revising $A$ based on hypothesis tests for differential correlation intensity across all treatment groups. Hypothesis testing is done based on a user-specified method, between two possible testing approaches: a Kruskal-Wallis approach, discussed in @sec-kw-test, and a permutation-based approach, discussed in @sec-perm-test. The motivation for both approaches and the formal hypothesis being tested are discussed in @sec-parametric, where we address why standard parametric testing is not directly applicable to correlation-based statistics of this form. Regardless of the chosen method, p-values are adjusted for multiple comparisons using the Benjamini-Hochberg procedure for dependent tests (Benjamini & Yekutieli, 2001), and items are retained whose adjusted p-values fall below a chosen significance level \alpha.
 
 
 Iteration continues until the set stabilizes, yielding an estimated differentially correlated (DC) set. These DC sets have the desired characteristic discussed in @sec-intro: a group of items where correlation between items in the set have differing strength across conditions. 
@@ -248,7 +249,7 @@ ggplot(sim_results_sk, aes(x = S_k)) +
 Under the high signal scenario, where Treatment 1 has true within-set correlation $\rho = 0.8$ and Treatments 2 and 3 have $\rho = 0$, the distribution of $S_1(j, A)$ is strongly left-skewed while $S_2(j, A)$ and $S_3(j, A)$ remain more symmetric. A normal approximation fits poorly for Treatment 1, where it matters most.
 
 
-To combat this issue, Bodwin, Zhang, and Nobel (2018) leveraged individual sample-level correlation contributions to construct a test statistic that had approximately normal behavior in the two-treatment situation, despite sample correlations being highly non-normal. Contributions refer to the inner products of each observation's standardized measurements with the mean profile of the current set $A$ under each condition. They show that their resulting test statistic, when standardized by a consistent estimator of its null variance, follows an approximate standard normal distribution for sufficient sample sizes. Using this fact, items can be tested with a parametric approach for inclusion in a DC set. Based on this previous result, a natural starting point for the three-treatment case is to construct an analogous test statistic using the same sample-level correlation contributions, now computed across all three conditions simultaneously. 
+To combat this issue, Bodwin et. al. (2018) leveraged individual sample-level correlation contributions to construct a test statistic that had approximately normal behavior in the two-treatment situation, despite sample correlations being highly non-normal. Contributions refer to the inner products of each observation's standardized measurements with the mean profile of the current set $A$ under each condition. They show that their resulting test statistic, when standardized by a consistent estimator of its null variance, follows an approximate standard normal distribution for sufficient sample sizes. Using this fact, items can be tested with a parametric approach for inclusion in a DC set. Based on this previous result, a natural starting point for the three-treatment case is to construct an analogous test statistic using the same sample-level correlation contributions, now computed across all three conditions simultaneously. 
 
 
 We define the necessary quantities for the three-treatment correlation contribution framework. First, we standardize each item's measurements by row within each treatment group. For item $i$ and sample $j$, define:
@@ -283,40 +284,193 @@ Under the ANOVA assumptions, which would require contributions are approximately
 $$
 F=\frac {SS_{treatment}/(3−1)} {SS_{error}/(n_{total}−3)}≈F_{2,n_{total}−3}
 $$
-This, in theory, would be the multivariate version of the correlation contribution breakdown from Bodwin, Zhang, and Nobel (2018), which would allow for the use of a parametric test in the update step.
+This, in theory, would be the multivariate version of the correlation contribution breakdown from Bodwin et. al. (2018), which would allow for the use of a parametric test in the update step.
 However, the contributions ($\tilde{u}_{j\ell}, \tilde{v}_{j\ell}, \tilde{w}_{j\ell}$) must be independent and normally distributed for the statistic to reliably follow the $F$-distribution. 
 
 
-We know independence does not hold, as dependence is introduced by the row standardization. For example, computing $u_{j\ell} = \frac {(x_{j\ell} - \bar {x}_j)}{\text{sd}(x_j)}$ involves all $n_1$ samples, so contributions within a group are not independent of one another. We can assess the normality assumption using simulated data from the framework described in @sec-simulation. Using a simulation with 100 items, 20 samples per group, and true correlation between items in the target set $\rho = 0.8$ under treatment 1 and $\rho = 0$ under treatments 2 and 3, @fig-contributions displays the individual contributions $\tilde{u}_{j\ell}, \tilde{v}_{j\ell}, \tilde{w}_{j\ell}$ for a selection of four items, three of which have high signal and one having no signal.
+We implemented this approach, using the parametric $F$-test to iteratively update the candidate set A, and applied it to simulated data. Based on our studies, we found the results to be untrustworthy. Computed p-values were all highly insignificant, which in the context of VSAT, which in the context of VSAT always produced empty candidate sets regardless of the true signal level or set size. This prompted an examination of the assumptions underlying the $F$-statistic.
+
+
+We know independence does not hold, as dependence is introduced by the row standardization. For example, computing $u_{j\ell} = \frac {(x_{j\ell} - \bar {x}_j)}{\text{sd}(x_j)}$ involves all $n_1$ samples, so contributions within a group are not independent of one another. We can assess the normality assumption using simulated data from the framework described in @sec-simulation. Using a simulation with 100 items, 20 samples per group, and a true correlation between items in the target set of $\rho = 0.8$ under treatment 1 and $\rho = 0$ under treatments 2 and 3, @fig-contributions displays the individual contributions $\tilde{u}_{j\ell}, \tilde{v}_{j\ell}, \tilde{w}_{j\ell}$ for an item known to be in the target set:
 
 
 ```{r}
+#| label: fig-contributions
+#| echo: FALSE
+#| warning: FALSE
 
+set.seed(99)
+
+unscaled <- treatment_data_generation_3d(100, 20, 0.8, 0, 0, c(1:10))
+
+get_contributions <- function(data, A0 = character(0)) {
+  
+  A <- A0
+  taxa <- rownames(data[[1]])
+  
+  uvw_vals <- lapply(data, function(mat) t(scale(t(mat))))
+  
+  out <- list()
+  
+  for (j in taxa) {
+    m <- compute_m_vecs(uvw_vals, A, j)
+    u_contributions <- uvw_vals[[1]][j, ] * m$m1
+    v_contributions <- uvw_vals[[2]][j, ] * m$m2
+    w_contributions <- uvw_vals[[3]][j, ] * m$m3
+    
+    n1 <- length(u_contributions)
+    n2 <- length(v_contributions)
+    n3 <- length(w_contributions)
+    
+    out[[j]] <- tibble(
+      Taxa = j,
+      Treatment = rep(c("T1","T2","T3"), times = c(n1, n2, n3)),
+      Value = c(u_contributions, v_contributions, w_contributions)
+    )
+  }
+  bind_rows(out)
+}
+
+contributions <- get_contributions(
+  unscaled,
+  c("V1","V2","V3","V4","V5","V6","V7","V8","V9","V10")
+)
+
+library(ggridges)
+
+contributions |>
+  filter(Taxa == "V1") |>
+  mutate(
+    Treatment = fct_recode(Treatment,
+      "Treatment 1 (ρ = 0.8)" = "T1",
+      "Treatment 2 (ρ = 0)"   = "T2",
+      "Treatment 3 (ρ = 0)"   = "T3"
+    ),
+    Treatment = fct_relevel(Treatment,
+      "Treatment 3 (ρ = 0)",
+      "Treatment 2 (ρ = 0)",
+      "Treatment 1 (ρ = 0.8)"
+    )
+  ) |>
+  ggplot(aes(x = Value, y = Treatment, fill = Treatment)) +
+  geom_density_ridges(
+    alpha          = 0.7,
+    scale          = 0.9,
+    quantile_lines = TRUE,
+    quantiles      = 2
+  ) +
+  scale_fill_manual(values = c(
+    "Treatment 1 (ρ = 0.8)" = "#F8766D",
+    "Treatment 2 (ρ = 0)"   = "#00BA38",
+    "Treatment 3 (ρ = 0)"   = "#619CFF"
+  )) +
+  labs(
+    title    = "Distribution of Correlation Contributions for Item 1",
+    subtitle = "A member of A with true within-set correlation ρ = 0.8 under Treatment 1",
+    x        = "Contribution",
+    y        = NULL
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    strip.background = element_rect(fill = "grey92"),
+    strip.text       = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    legend.position  = "none"
+  )
 ```
 
 
+As shown in @fig-contributions, the normality assumption also clearly fails. Under Treatment 1, where the true within-set correlation is $\rho = 0.8$, the contributions are strongly right-skewed. With both the independence and normality assumptions violated, the $F$-statistic does not follow the $F_{2,n_{total}-3}$ distribution under $H_0$, which explains the uniformly large p-values observed in practice.
 
-As a result, the $F$-statistic above does not reliably follow the stated distribution, and p-values derived from it are not trustworthy. This rules out a direct parametric approach and motivates the two alternatives discussed in @sec-kw-test and @sec-perm-test.
+However, the parametric approach was not entirely uninformative. Although p-values were inflated, those corresponding to items that should have been included in $A$ were consistently smaller than those for items outside the true set. This indicated that the correlation contributions were carrying the appropriate information, and that the breakdown was due to violated assumptions rather than a fundamental flaw in the contributions. This motivates the two alternatives discussed in @sec-kw-test and @sec-perm-test to bypass assumptions with non-parametric methods.
+
+
+## Kruskal-Wallis Testing {#sec-kw-test}
+
+
+The Kruskal-Wallis test (Kruskal & Wallis, 1952) is a non-parametric analog of one-way ANOVA that assesses whether the distributions of some statistic differ across three or more groups based on the ranks of the observed values. Unlike the $F$-test, it does not require the observations to be normally distributed or have equal variance across groups, making it a natural substitute in our setting, since correlations are highly non-normal under high signal. The Kruskal-Wallis test does still assume approximate independence of observations across groups, an assumption we noted in @sec-parametric is not strictly satisfied here. This assumption was also not strictly satisfied in the original DCM procedure, so we will proceed under the same justification.
+
+
+Using the Kruskal-Wallis test, we assess the following null hypothesis for determining set inclusion of an item $j$ into a candidate set $A$, evaluated at some arbitrary iteration of the VSAT procedure:
+$$
+H_0: S_1(j, A) = S_2(j, A) = S_3(j, A)
+$$
+We test this against the alternative that average correlation between item $j$ and items in set $A$ differs across at least one pair of treatment conditions. To test these hypotheses, we apply the Kruskal-Wallis test to the correlation contributions that were defined in @sec-parrametric, pooling all $n_{total} = n_1 + n_2 + n_3$ contributions, ranking them, and computing:
+$$
+H = \frac{12}{n_{total}(n_{total} + 1)} \sum_{k=1}^{3} \frac{R_k^2}{n_k} - 3(n_{total} + 1)
+$$
+where $R_k$ is the sum of ranks assigned to contributions in treatment $k$. Under $H_0$, for sufficiently large sample sizes, $H$ approximately follows a $\chi^2$ distribution with 3 - 1 = 2 degrees of freedom, from which a p-value is obtained. The resulting p-value is adjusted using the Benjamini-Hochberg procedure and evaluated for inclusion in $A$ at the chosen significance level.
 
 
 ## Permutation Testing {#sec-perm-test}
 
 
-## Kruskal-Wallace Testing {#sec-kw-test}
+A second, alternative non-parametric approach is using permutation testing. Permutation testing is well established for use in correlation analysis and has been shown to be effective in determining overall differences in correlation structure across conditions (Gómez et. al. 2025). The advantage to using the permutation testing method is that it makes no assumptions about the data. Unlike the Kruskal-Wallis test, it also does not require independence of observations on top of making no distributional assumptions about the data. This makes it particularly well suited to situations involving correlation-based statistics, where independence is difficult to establish.
+
+
+Our implementation of permutation testing assesses the same hypotheses outlined in @sec-kw-test, but does not utilize contributions. Instead, we construct the statistic based on the affinity directly, identical to @eq-affinity:
+$$
+\Delta(j, A) = \frac13 \sum_{k=1}^3 (S_{k}(j, A) - \bar S(j, A))^2
+$$
+To construct the empirical null distribution sample labels are randomly reassigned across treatment groups while preserving the original group sizes, eliminating any true condition-specific correlation structure while maintaining the overall variability of the data. For each permutation, the affinity $\Delta(j,A)$ is recomputed on the permuted datasets, and the process is repeated many times to produce a null distribution of affinity (\Delta) values under $H_0$. The p-value for item j is determined based on the proportion of permuted affinities at least as extreme as the observed value.
+$$
+\hat p_j = \frac1B \sum_{b=1}^{B}\left [\Delta^{(b)}(j, A) \geq  \Delta(j, A) \right]
+$$
+where B is the specified number of permutations (default $B$ = 1000).
+
+
+As with the Kruskal-Wallis approach, the resulting p-values are adjusted using the Benjamini-Hochberg procedure before determining inclusion in the candidate set at the chosen significance level.
 
 
 ## Initialization {#sec-set-init}
 
 
+VSAT relies on a current set A at each iteration, including the first, for item comparison. The choice of initial set therefore determines the starting point of the search procedure. We offer two options for set initialization.
+
+
+The first option is a user-specified set of interest. This is the preferred option when prior knowledge about the system is available, such as biological hypotheses about which items may exhibit differential correlation, or a set identified from a previous analysis. A user-specified initialization tends to produce more reliable results, particularly when the true differentially correlated set has only weak signal or when only a subset of the true members are included in the initial set. For example, a researcher interested in whether a particular group of microbial taxa exhibits condition-dependent co-occurrence behavior can initialize $A$ with that group directly, allowing the algorithm to refine the set from a starting point motivated by domain knowledge.
+
+
+The second option is a greedy initialization procedure. All items are ranked by the variance of their mean standardized value across treatment groups as a cheap way of identifying items whose behavior differs across conditions, keeping only the top $M$ items as a candidate starting point. $M$ can be adjusted based on the size of the overall item set. For each item $j$ in the top $M$, the chosen testing method is applied treating item $j$ as a singleton set. The top items with the most significant resulting p-values are collected as a candidate initial set, and the process is repeated for all $M$ starting points. The candidate initial set with the smallest adjusted p-values are kept as the set passed into the first iteration of the main VSAT loop. We chose to employ a greedy initialization because we found that, in practice, beginning from a random or empty start almost always leads to an empty resulting set.
+
+
 # Simulation Study {#sec-simulation}
 
 
-# Vineyard Data
+To evaluate the performance of VSAT, we conduct a simulation study where the true differentially correlated set is known prior to applying the algorithm. We compare the resulting sets formed by VSAT to the true known sets, providing us with a basic understanding of performance under different controlled conditions.
+
+
+## Simulation Specifications {#sec-sim-spec}
+
+
+Data are generated as multivariate normal samples across three treatment groups, each with $p$ items and $n$ samples. A single true DC set is specified prior to generation, with items in the set assigned a common pairwise correlation of $\rho_k$ under treatment $k$, and all items outside the true set generated as independent standard normal noise with no correlation structure. The differential signal is controlled entirely through the choice of $(\rho_1, \rho_2, \rho_3)$. For example, setting $\rho_1 = 0.8$ and $\rho_2 = \rho_3 = 0$ produces a dataset where items in the set are strongly correlated under treatment 1 but uncorrelated under treatments 2 and 3. Across the study, we varied the number of items $p$, the number of samples per group $n$, the size of the true set, and the correlation strengths $(\rho_1, \rho_2, \rho_3)$.
+
+
+## Simulation Results {#sec-sim-results}
+
+
+
+
+
+## Time/Memory Cost {#sec-cost}
+
+
+# Vineyard Data {#sec-vineyard}
+
+
+## Vineyard Data Results {#sec-vineyard-results}
 
 
 # Conclusion
 
 
+
+
+
+## Future Work
+
+
+New initializations, variance stabilization as in Gomez et. al., finding an appropriate parametric test...
 
 
 # Literature Review
