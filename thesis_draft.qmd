@@ -50,7 +50,7 @@ data("starwars")
 Sustainable farming practices are crucial in minimizing the environmental impact of agricultural production. A key factor is understanding soil health, which is essential for crop productivity and longevity. Soil health is largely influenced by the variety and abundance of soil microorganisms, which perform essential functions such as nutrient cycling, decomposition, and disease suppression.
 
 
-A study conducted by the Chemistry department at California Polytechnic State University, San Luis Obispo sampled soil from a Central California vineyard, measuring microbial community composition across three years and four stages of the grapevine life cycle: bud break, bloom, veraison, and harvest. Three experiments tested the effects of herbicide presence, cover cropping, and fertilizer type on microbial abundance. Three replicate soil samples were collected per treatment at each stage, yielding 96 total samples. These samples were analyzed for genetic markers leading to an estimate of abundance for each class of microorganism present.
+A study conducted by the Chemistry department at California Polytechnic State University, San Luis Obispo sampled soil from a Central California vineyard, measuring microbial community composition across three years and four stages of the grapevine life cycle: bud break, bloom, veraison, and harvest (Richmond? et. al., in preparation). Three experiments tested the effects of herbicide presence, cover cropping, and fertilizer type on microbial abundance. Three replicate soil samples were collected per treatment at each stage, yielding 96 total samples. These samples were analyzed for genetic markers leading to an estimate of abundance for each class of microorganism present.
 
 
 ![Experiment Design](experiment design.png){#fig-design}
@@ -443,34 +443,154 @@ To evaluate the performance of VSAT, we conduct a simulation study where the tru
 ## Simulation Specifications {#sec-sim-spec}
 
 
-Data are generated as multivariate normal samples across three treatment groups, each with $p$ items and $n$ samples. A single true DC set is specified prior to generation, with items in the set assigned a common pairwise correlation of $\rho_k$ under treatment $k$, and all items outside the true set generated as independent standard normal noise with no correlation structure. The differential signal is controlled entirely through the choice of $(\rho_1, \rho_2, \rho_3)$. For example, setting $\rho_1 = 0.8$ and $\rho_2 = \rho_3 = 0$ produces a dataset where items in the set are strongly correlated under treatment 1 but uncorrelated under treatments 2 and 3. Across the study, we varied the number of items $p$, the number of samples per group $n$, the size of the true set, and the correlation strengths $(\rho_1, \rho_2, \rho_3)$.
+Data are generated as multivariate normal samples across three treatment groups, each with $p$ items and $n$ samples. A single true DC set is specified prior to generation, with items in the set assigned a common pairwise correlation of $\rho_k$ under treatment $k$, and all items outside the true set generated as independent standard normal noise with no correlation structure. The differential signal is controlled entirely through the choice of $(\rho_1, \rho_2, \rho_3)$. For example, setting $\rho_1 = 0.8$ and $\rho_2 = \rho_3 = 0$ produces a dataset where items in the set are strongly correlated under treatment 1 but uncorrelated under treatments 2 and 3. Across the study, we varied the number of items $p$, the number of samples per group $n$, the size of the true set, and the correlation strengths $(\rho_1, \rho_2, \rho_3)$. Since the true differentially correlated set is known by construction in the simulation, we can evaluate VSAT using precision, recall, and F1 score, comparing the returned set to the known ground truth.
 
 
 ## Simulation Results {#sec-sim-results}
 
 
+We first assess how strongly the differential correlation signal must be for VSAT to reliably recover the true DC set, fixing $p$ = 100, $n$ = 36 and the true set size at 10, while varying $\rho_1$ between 0.3 and 0.9, keeping $\rho_2$ = $\rho_3$ = 0 constant. We do not specify a starting set in this case, allowing for greedy initialization of $A$.
 
+
+![](plots/single_signal.png){#fig-single-signal}
+
+
+Both methods show consistent improvement across all metrics as signal strength increases. At low signal ($\rho_1$ = 0.3), both methods fail to detect the true set in nearly all runs, with empty set rates of approximately 0.97 for Kruskal-Wallis and 0.82 for the permutation method. The permutation method shows a meaningful advantage beginning at $\rho_1$ = 0.5, achieving roughly twice the recall of Kruskal-Wallis and a substantially lower empty set rate. Both methods become largely reliable by $\rho_1$ = 0.6, with recall above 0.75 and empty set rates near zero. At high signal, the methods diverge in precision: Kruskal-Wallis achieves precision near 0.95 at $\rho_1$ = 0.9, while the permutation method stabilizes around 0.80, indicating it tends to include more items outside the true set. Overall, both methods require a within-set correlation of at least $\rho_1$ = 0.6 to reliably detect the true set, with the permutation method preferred when signal is weak and Kruskal-Wallis preferred when signal is strong.
+
+
+Under the signal gradient scenario, $\rho_2$ = 0.3 and $\rho_3$ = 0.1 are held constant while $\rho_1$ varies between 0.3 and 0.9, with all other parameters matching the single signal study. When $\rho_1$ = 0.3, treatments 1 and 2 have identical within-set correlation, so there is effectively no differential signal to detect. Set discovery should increase as $\rho_1$ grows further from the background signal of $\rho_2$ = 0.3.
+
+
+![](plots/signal_gradient_constant.png){#fig-gradient}
+
+
+As shown in @fig-gradient, the permutation method outperforms Kruskal-Wallis across all signal levels in terms of recall, F1, and empty set rate. The gap between methods is considerably larger here than in the single signal scenario, suggesting that the Kruskal-Wallis test is particularly sensitive to the presence of correlation across all treatments simultaneously, making it less able to distinguish differential from uniform correlation. The permutation method shows meaningful recall beginning around $\rho_1$ = 0.7, reaching near-perfect recovery by $\rho_1$ = 0.9, while Kruskal-Wallis does not achieve comparable performance until $\rho_1$ = 0.9. The one setting where Kruskal-Wallis is competitive is precision at high signal ($\rho_1$ > 0.7), where it slightly outperforms the permutation method, consistent with the pattern observed in the single signal study. 
+
+
+Together, the single signal and gradient results suggest that the permutation method is the more robust choice across a range of conditions, particularly when the differential signal is moderate or when background correlation is present. Kruskal-Wallis achieves comparable or slightly better precision at high signal but at the cost of substantially reduced sensitivity elsewhere.
+We additionally assess how VSAT performance varies with the number of samples per group $n$, fixing $\rho_1$ = 0.7, $p$ = 100, and the true set size at 10.
+
+
+![](plots/sample_size.png){#fig-sample-size}
+
+
+As expected, performance improves with larger sample sizes. At $n$ = 10, both methods show high empty set rates, approximately 0.97 for Kruskal-Wallis and 0.75 for the permutation method, and near-zero recall, reflecting the difficulty of estimating reliable correlations from very few samples. Performance improves rapidly between $n$ = 10 and $n$ = 20, with the permutation method achieving recall above 0.75 and an empty set rate near 0.19 at $n$ = 20, while Kruskal-Wallis lags behind with recall of approximately 0.55 and an empty set rate of 0.35. By $n$ = 35, both methods are largely reliable, with high recall and empty set rates close to zero. The permutation method shows a consistent advantage in recall at small sample sizes, while Kruskal-Wallis achieves slightly higher precision throughout, consistent with the signal strength results.
+
+
+Finally, we assess performance as a function of the total number of items pp
+p, fixing $\rho_1$ = 0.7, $n$ = 36, and the true set size at 10.
+
+
+![](plots/population_size.png){#fig-pop-size}
+
+
+The population size results reveal an important scalability limitation. As $p$ grows from 20 to 250, recall and F1 degrade steadily for both methods, with empty set rates rising sharply at $p$ = 250, reaching approximately 0.72 for Kruskal-Wallis and 0.55 for the permutation method. This degradation occurs because a larger item population introduces more candidates for false inclusion, making the multiple testing correction increasingly stringent, so items that would have been significant at $p$ = 100 may no longer pass the adjusted threshold at $p$ = 250. The permutation method degrades more gracefully in recall and empty set rate as $p$ increases, though Kruskal-Wallis maintains higher precision at large $p$, dropping only to approximately 0.87 at $p$ = 250 compared to 0.68 for the permutation method.
+
+
+Taken together, these results suggest that VSAT is most reliable when sample sizes are at least 35 per group and the item population does not greatly exceed 100 items at moderate signal strengths. Beyond $p$ = 100, performance degrades noticeably, with the permutation method being preferred for recall but Kruskal-Wallis maintaining higher precision where computational cost permits.
+
+
+![](plots/null_simulation.png){#fig-null-set}
+
+
+@fig-null-set shows the false discovery rate under non-differential correlation, where $\rho_1 = \rho_2 = \rho_3 = \rho$ and a returned DC set is counted as a false discovery. The Kruskal-Wallis method shows very low false discovery rates across all background correlation levels, remaining at or below the conventional 0.05 threshold. The permutation method shows a more elevated rate, ranging from roughly 5-15% across correlation levels, consistently above the 0.05 threshold. These estimates should be interpreted with caution given only 25 simulation replications per condition due to time restrictions and consistency. as the zero rates observed for Kruskal-Wallis are consistent with a true underlying rate anywhere up to approximately 12% and should not be taken as evidence of perfect null control. Despite the low number of replicates, the difference between methods is meaningful: the Kruskal-Wallis method appears to control false discoveries considerably better than the permutation method under non-differential correlation, consistent with its more conservative trends observed throughout the simulation study.
 
 
 ## Time/Memory Cost {#sec-cost}
 
 
+We benchmark VSAT to compare Kruskal-Wallis and permutation methods across the number of items $p$ and samples per group $n$. Both benchmarks use $n_{perm} = 200$ permutations for the permutation method. 
+
+
+![](plots/item_size_benchmark.png){#fig-itemsize-benchmark}
+
+
+@fig-itemsize-benchmark shows runtime as a function of $p$. The Kruskal-Wallis method scales approximately linearly, growing from roughly 2 seconds at $p = 20$ to roughly 23 seconds at $p = 500$. The permutation method, by contrast, was faster than the Kruskal-Wallis method for $p \leq 200$, but grows sharply beyond that, reaching approximately 83 seconds at $p$ = 500. This severe scaling issue is expected, as each permutation requires computing three $p \times p$ correlation matrices ($O(p^2 n)$), repeated $n_{perm}$ times per VSAT iteration. 
+
+
+![](plots/sample_size_benchmark.png){#fig-pop-size-benchmark}
+
+@fig-pop-size-benchmark shows runtime as a function of $n$, the sample size. Both methods scale with $n$, as larger samples increase the cost of both row-scaling (Kruskal-Wallis) and correlation matrix computation (permutation). However, the permutation method grows more steeply than the Kruskal-Wallis method with sample size. Therefore, Kruskal-Wallis method is preferred in terms of time cost when $p$ is large, while the permutation method is competitive for smaller datasets where its exact null distribution may be worth the additional cost. 
+
+
+A natural question is how much of this runtime is attributable to initialization versus the core iterative procedure. We examine this next by comparing greedy initialization against runs supplied with a pre-specified anchor set $A_0$, which bypasses initialization entirely and isolates the cost of the iterative loop alone. 
+
+
+![](plots/init_comparison.png){#fig-init-comp}
+
+
+@fig-init-comp compares runtime under greedy initialization against a pre-specified set of three confirmed true DC taxa, across both methods. For the Kruskal-Wallis method, providing a pre-specified set reduces runtime to near zero across all values of $p$, confirming that initialization dominates its computational cost. The iterative loop itself is essentially free once a starting point is supplied. The permutation method tells a very different story: the informed starting point is substantially slower than greedy, reaching approximately 460 seconds at $p$ = 500 compared to roughly 83 seconds under greedy initialization. This is likely explained by the interplay between sensitivity and convergence behavior. Due to high sensitivity in the permutation method, starting from a strong, true DC set, likely causes constant updates of candidate set, requiring more iterations to converge. The greedy initialization, by contrast, produces shorter runtimes at large $p$ not because it is more efficient per iteration, but because its reduced accuracy at high $p$, as seen in the simulation results, leads to earlier termination with a smaller returned set. In this sense, the greedy permutation runtime at large $p$ reflects the method finding less rather than converging faster.
+
+
+In terms of the memory cost of VSAT, at each permutation iteration, VSAT computes three $p \times p$ correlation matrices and discards them immediately before the next iteration begins, so peak memory in use at any moment is capped at six $p \times p$ matrices. In practice this means peak memory usage is $O(p^2)$ regardless of the number of permutations or samples, and is unlikely to cause issues on modern hardware for the item set size in typical applications. Problems would only be expected to arise for population sizes substantially exceeding $p$ = 500.
+
+## Simulation Takeaways (workshop name) {#fig-sim-takeaway}
+
+
+Overall, the simulation results paint a clear picture of the tradeoffs between the two methods. The permutation method is the more sensitive choice, particularly when the differential signal is weak, when background correlation is present across all groups, or when sample sizes are small. However, this sensitivity comes at the cost of a higher false discovery rate under the null and substantially greater computational expense at large item population sizes ($p$). The Kruskal-Wallis method is faster, more conservative, and more precise at strong signal levels, but struggles to detect differential correlation when the signal is moderate or when there is baseline correlation across treatments. In practice, the results of this simulation study conveys the following: (1) When signal is expected to be strong and $p$ is large, the Kruskal-Wallis method is the practical choice. (2) When signal may be weak or a background correlation structure is present, the permutation method is preferred provided reasonable $p$ and available compute time permit.
+
+
 # Vineyard Data {#sec-vineyard}
+
+
+Recall the vineyard microbial data, introduced in @sec-intro (Richmond et. al., in preparation), in which microorganism counts were recorded across soil samples collected over three years from an experimental plot in a vineyard. The study consisted of three experiments — Herbicide (2 treatment levels), Crop Cover (3 treatment levels), and Fertilizer (3 treatment levels) — each designed to assess how different vineyard management practices influence the soil microbial community. In each soil sample, counts for thousands of microbial species are recorded. Following (capstone citation), we aggregate these counts to the class taxonomic level and analyze beta diversity behavior across treatment conditions, as class-level patterns provide a more interpretable and stable signal than the sparse species-level counts. 
+
+
+Pairwise differential correlation analysis of this dataset has previously been conducted in (cite capstone paper), where DC sets were identified by applying a two-treatment clustering algorithm separately to each pair of treatment levels. While informative, pairwise comparisons cannot capture the overall structure of correlation differences across all three conditions simultaneously. An identified DC set between two specific levels may not have true differential correlation behavior across all three treatments.
+
+
+We apply VSAT to each experiment in two ways. First, with no pre-specified initial set, allowing the greedy initialization procedure to determine the starting point. Second, using the DC sets identified from the pairwise comparisons in (cite capstone paper) as user-specified initial sets, which allows us to assess whether those previously identified sets hold up under the more stringent three-treatment framework and whether VSAT can refine or change them in a meaningful way.
 
 
 ## Vineyard Data Results {#sec-vineyard-results}
 
 
+Applying VSAT to the vineyard dataset with greedy initialization returned no differentially correlated sets under either method across both the Crop Cover and Fertilizer experiments. Given the simulation results indicating that VSAT reliably detects differential correlation for dimensions comparable to these vineyard data ($p$ = 72, $n$ = 36), these results suggest that differential correlation at the class taxonomic level is weak or absent in both experiments.
+
+
+To further probe whether differential correlation exists in the vineyard data, we use the DC sets identified from pairwise analysis in (capstone citation) as pre-specified initial sets for VSAT. For each experiment, pairwise DC sets were available for all directed comparisons between treatment levels, yielding six sets of modules for both the Crop Cover and Fertilizer experiments. These were pooled into a single collection of starting sets and passed individually as $A_0$ to VSAT, allowing us to assess whether any pairwise-identified set holds up under the more stringent simultaneous three-treatment framework. The permutation method was used due to its greater sensitivity.
+
+
+Passing all pairwise DC sets as pre-specified initial sets produced sparse results in both experiments, with the overwhelming majority returning empty under the three-treatment framework. Most of the starting modules converged to empty sets, 71 of the crop cover starting modules and 88 of the fertilizer starting modules, indicating that most pairwise-identified differential correlation does not persist when assessed across all three treatment levels.
+
+
+In the Fertilizer experiment, three non-trivial returned sets of size two or greater were identified. The most reliable of these is caldilineae and sphingobacteriia, which was returned independently by three distinct starting modules, suggesting this pair represents the most robust differential correlation signal across fertilizer treatments. Two other sets — blastocatellia, gammaproteobacteria, and spartobacteria, and firmicutes and nitriliruptoria — were each reached by a single starting module.
+
+
+Looking more deeply into the correlation between Caldilineae and Sphingobacteriia across the three fertilizer treatments, the pair shows a strong positive correlation under no fertilizer ($r=0.684$), weak positive correlation under organic fertilizer ($r=0.136$) and a weak negative correlation under synthetic fertilizer ($r=−0.092$). This pattern shows differential behavior between these two classes associated with fertilizer application.
+
+
+The Crop Cover experiment produced more non-trivial returned sets, with 13 of the starting modules returning sets of size two or greater. The two most reliable are fibrobacteria and thermodesulfobacteria, and holophagae and mollicutes, each of which was returned by two independent starting modules. The remaining 11 sets were each reached by a single starting module. 
+
+
+Notably, across both the Crop Cover and Fertilizer experiments, the returned sets consistently differ from their starting modules, indicating that VSAT is not simply confirming the pairwise results but actively refining the set based on the three-treatment correlation structure. In several cases, classes that appeared in the pairwise starting set were dropped entirely from the returned set, while new classes not present in the original pairwise module were added, suggesting that some pairwise-identified differential correlation does not generalize to the three-treatment setting. This highlights the value of a simultaneous three-treatment framework, as pairwise analysis alone cannot distinguish differential correlation that will hold coherently across all conditions.
+
+
 # Conclusion
 
 
+This thesis introduced VSAT (Variable Set Association Testing), a generalization of the Differential Correlation Mining framework of Bodwin et al. (2018) to the three-or-more treatment setting, motivated by the structure of the vineyard soil microbiome experiment. Two non-parametric testing approaches were developed — a Kruskal-Wallis method and a permutation-based method — after a parametric $F$-test approach was shown to be unreliable due to violated independence and normality assumptions in the correlation contribution framework. The simulation study established that both methods reliably recover true DC sets when within-set correlation is at least $\rho_1$ = 0.6 and sample sizes are adequate, with the permutation method preferred when signal is weak or background correlation is present, and the Kruskal-Wallis method preferred when signal is strong, pp
+p is large, or false discovery control is a priority.
 
+
+Applied to the vineyard dataset, greedy initialization returned no DC sets in either experiment, suggesting that differential correlation at the class taxonomic level is weak or absent. Using pairwise DC sets from prior analysis as pre-specified initial sets revealed sparse but interpretable structure, with the most robust finding being a clear correlation gradient between Caldilineae and Sphingobacteriia across fertilizer treatments. The returned sets consistently differed from their starting modules, demonstrating that VSAT finds meaningful patterns in three treatments simultaneously that differ from the pairwise results.
 
 
 ## Future Work
 
 
-New initializations, variance stabilization as in Gomez et. al., finding an appropriate parametric test...
+Several directions for future work related to VSAT remain. The most natural next step, specifically for the vineyard data, would be to apply VSAT at a finer taxonomic level. Aggregating counts to the class level, while providing stability and a more manageable population size, may smooth over differential correlation patterns. Applying VSAT at the order or family level would increase the resolution of the analysis and may reveal new differential correlation behavior that is lost by aggregating.
+
+
+The most impactful would be deriving the appropriate parametric null distribution for the test statistic using the contribution breakdown outlined in @sec-parametric and @sec-kw-test. While the Kruskal-Wallis method already scales reasonably well to large item sets, a parametric alternative to permutation testing would allow for exact p-values accessible and efficient for extremely large item sets. Related to deriving exact p-values for set determination, an important improvement noted in @sec-sim-results would be developing formal Type I error control for VSAT, as both methods show elevated false discovery rates under null correlation.
+
+
+Another possible improvement is the application of a variance stabilization technique, such as that used in Gomez et. al. (2025), to the correlation estimates prior to testing, which may reduce sensitivity to small correlation magnitudes and improve the performance of the permutation test application. 
+
+
+The initialization procedure also likely requires optimization. The current greedy approach is effective but carries relatively large cost at large $p$, and faster or more theoretically motivated starting points could improve runtime without sacrificing discovery. 
+
+Beyond these, application and formal definitions for more than three treatment groups is the natural next step, allowing for comparison under an arbitrary $k$ number of treatment simultaneously.
 
 
 # Literature Review
